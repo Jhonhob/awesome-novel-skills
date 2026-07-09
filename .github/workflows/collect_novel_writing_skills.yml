@@ -51,28 +51,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Parse input parameters
-          MIN_STARS=${{ github.event.inputs.min_stars || '1' }}
-          LANGUAGES=${{ github.event.inputs.languages || 'Python JavaScript TypeScript Jupyter Notebook' }}
-          INCLUDE_ISSUES=${{ github.event.inputs.include_issues || 'true' }}
-          INCLUDE_TOPICS=${{ github.event.inputs.include_topics || 'true' }}
-          
-          # Convert comma-separated languages to space-separated
-          LANGUAGES_ARG=$(echo $LANGUAGES | tr ',' ' ')
-          
-          # Build command arguments
-          ARGS="--github-actions-mode --min-stars $MIN_STARS --languages $LANGUAGES_ARG"
-          
+          # Parse input parameters (quote expanded expressions)
+          MIN_STARS="${{ github.event.inputs.min_stars || '1' }}"
+          LANGUAGES="${{ github.event.inputs.languages || 'Python,JavaScript,TypeScript,Jupyter Notebook' }}"
+          INCLUDE_ISSUES="${{ github.event.inputs.include_issues || 'true' }}"
+          INCLUDE_TOPICS="${{ github.event.inputs.include_topics || 'true' }}"
+
+          # Convert comma-separated languages to space-separated (preserve as a single string)
+          LANGUAGES_ARG="$(echo "$LANGUAGES" | tr ',' ' ')"
+
+          # Build command arguments as an array to avoid word-splitting issues
+          ARGS=(--github-actions-mode --min-stars "$MIN_STARS" --languages "$LANGUAGES_ARG")
+
           if [ "$INCLUDE_ISSUES" = "false" ]; then
-            ARGS="$ARGS --no-issues"
+            ARGS+=(--no-issues)
           fi
-          
+
           if [ "$INCLUDE_TOPICS" = "false" ]; then
-            ARGS="$ARGS --no-topics"
+            ARGS+=(--no-topics)
           fi
-          
-          echo "Running with arguments: $ARGS"
-          python collect_novel_writing_skills.py $ARGS
+
+          echo "Running with arguments: ${ARGS[*]}"
+          python collect_novel_writing_skills.py "${ARGS[@]}"
       
       - name: Upload JSON artifact
         uses: actions/upload-artifact@v4

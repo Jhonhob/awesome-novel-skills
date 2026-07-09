@@ -1,4 +1,5 @@
 ```
-# Output files
-output/
+# GitHub workflow artifacts
+.github/workflows/
+
 ```
