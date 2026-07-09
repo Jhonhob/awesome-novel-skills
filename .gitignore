@@ -1,0 +1,38 @@
+```
+# Build artifacts and outputs
+output/
+*.json
+*.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py~
+*.pyc~
+*.pyo~
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Dependencies
+venv/
+.venv/
+.envrc
+.venv.bak/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+```
