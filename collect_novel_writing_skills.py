@@ -7,12 +7,13 @@ and discussions related to novel writing agent skills across multiple languages.
 
 Features:
 - Multi-language search queries (English, Chinese, French, German, Spanish, Italian, etc.)
-- Search GitHub for novel writing related agent skills
+- Precise search focusing on novel writing tools and AI agents
 - Collect repository information, descriptions, and topics
 - Export results to JSON and Markdown formats
 - Support for filtering by stars, language, and update time
 - GitHub Actions compatible with environment variable outputs
 - Deduplication and intelligent ranking
+- Smart relevance filtering to exclude unrelated repositories
 
 Usage:
     python collect_novel_writing_skills.py [--token YOUR_GITHUB_TOKEN] [--output-dir ./output]
@@ -24,6 +25,7 @@ For GitHub Actions:
 import os
 import json
 import argparse
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Set
 import requests
@@ -31,6 +33,41 @@ import requests
 
 class GitHubNovelWritingSkillsCollector:
     """Collector for novel writing agent skills from GitHub."""
+
+    # Keywords that indicate a repository is truly about novel writing
+    NOVEL_WRITING_KEYWORDS = [
+        'novel', 'fiction', 'story', 'writing', 'author', 'book', 'narrative',
+        'character', 'plot', 'scene', 'chapter', 'manuscript', 'screenplay',
+        'script', 'creative writing', 'literary', 'worldbuilding', 'outline',
+        '小说', '写作', '故事', '创作', '文学', '剧本', '角色', '情节',
+        'roman', 'écriture', 'histoire', 'livre', 'auteur',
+        'Roman', 'Geschichte', 'Schreiben', 'Autor', 'Buch',
+        'novela', 'escritura', 'historia', 'libro', 'autor',
+        'romanzo', 'scrittura', 'storia', 'libro', 'autore',
+        'romance', 'escrita', 'história', 'livro', 'autor',
+        'роман', 'письмо', 'история', 'книга', 'автор',
+        '小説', '執筆', '物語', '創作', '作家',
+        '소설', '작문', '이야기', '창작', '작가'
+    ]
+    
+    # Keywords that indicate unrelated repositories (to exclude)
+    EXCLUDE_KEYWORDS = [
+        'awesome-list', 'awesome-', 'curated list', 'learning resources',
+        'professional programming', 'machine learning', 'deep learning',
+        'data science', 'web development', 'mobile development',
+        'devops', 'cloud computing', 'database', 'api', 'framework',
+        'python tutorials', 'javascript tutorials', 'react', 'vue', 'angular',
+        'django', 'flask', 'fastapi', 'spring boot', 'laravel',
+        'tensorflow', 'pytorch', 'keras', 'scikit-learn',
+        'cybersecurity', 'blockchain', 'cryptocurrency', 'bitcoin',
+        'game engine', 'unity', 'unreal engine', 'godot',
+        'image processing', 'computer vision', 'natural language processing',
+        'speech recognition', 'face recognition', 'object detection',
+        'robotics', 'iot', 'embedded systems', 'hardware',
+        'networking', 'system administration', 'linux', 'windows',
+        'docker', 'kubernetes', 'aws', 'azure', 'gcp',
+        'git', 'version control', 'ci/cd', 'jenkins', 'github actions'
+    ]
 
     def __init__(self, token: Optional[str] = None):
         """
@@ -50,53 +87,53 @@ class GitHubNovelWritingSkillsCollector:
             self.headers['Authorization'] = f'token {self.token}'
 
         # Multi-language search queries related to novel writing agent skills
-        # Organized by language and category
+        # Focused on specific tools, agents, and applications
         self.search_queries = {
-            # English queries
+            # English queries - focused on novel writing tools and AI agents
             'english': [
-                "novel writing agent skills",
-                "story writing AI agent",
-                "creative writing assistant",
-                "fiction writing tools",
-                "narrative generation agent",
-                "character development AI",
-                "plot outline generator",
-                "world building assistant",
-                "dialogue writing AI",
-                "screenplay writing agent",
-                "writing prompt generator",
-                "story structure analyzer",
-                "automated storytelling",
-                "interactive fiction agent",
-                "writing coach AI",
-                "novel planning tool",
+                "novel writing assistant",
                 "story generator AI",
-                "literary creation assistant",
-                "fiction plot builder",
-                "character arc generator",
+                "fiction writing tool",
+                "character creator AI",
+                "plot generator",
+                "world building tool",
+                "dialogue generator",
+                "screenplay writer AI",
+                "writing prompt AI",
+                "story structure tool",
+                "automated storytelling",
+                "interactive fiction tool",
+                "writing coach AI",
+                "novel planner",
+                "story builder AI",
+                "literary creation tool",
+                "fiction plot generator",
+                "character arc tool",
+                "scene generator",
+                "chapter outline AI",
             ],
-            # Chinese queries (中文)
+            # Chinese queries (中文) - focused on novel writing tools
             'chinese': [
                 "小说写作助手",
-                "写作智能体",
-                "创作辅助工具",
-                "故事生成器",
-                "情节构思工具",
-                "角色设定生成",
-                "世界观构建助手",
-                "对话写作 AI",
-                "剧本创作工具",
-                "写作灵感生成",
+                "小说生成器",
+                "故事创作工具",
+                "角色生成器",
+                "情节生成器",
+                "世界观构建工具",
+                "对话生成器",
+                "剧本写作助手",
+                "写作灵感工具",
+                "小说大纲生成器",
                 "自动写小说",
-                "网文写作助手",
-                "小说大纲生成",
-                "创意写作 AI",
+                "网文写作工具",
+                "创意写作助手",
                 "叙事生成器",
-                "小说创作插件",
-                "写作技巧工具",
-                "故事结构分析",
-                "人物关系生成",
+                "小说创作软件",
+                "写作辅助工具",
+                "故事结构工具",
+                "人物关系生成器",
                 "章节生成器",
+                "场景生成器",
             ],
             # French queries (Français)
             'french': [
@@ -207,6 +244,38 @@ class GitHubNovelWritingSkillsCollector:
         self.collected_data = []
         self.seen_repos: Set[str] = set()
 
+    def is_novel_writing_related(self, repo_info: Dict[str, Any]) -> bool:
+        """
+        Check if a repository is truly related to novel writing.
+        
+        Args:
+            repo_info: Repository information dictionary
+            
+        Returns:
+            True if the repository is related to novel writing, False otherwise
+        """
+        # Combine name, description, and topics for checking
+        text_to_check = (
+            f"{repo_info.get('name', '')} "
+            f"{repo_info.get('description', '')} "
+            f"{' '.join(repo_info.get('topics', []))}"
+        ).lower()
+        
+        # Check if it contains novel writing keywords
+        has_novel_keyword = any(
+            keyword.lower() in text_to_check 
+            for keyword in self.NOVEL_WRITING_KEYWORDS
+        )
+        
+        # Check if it contains exclusion keywords
+        has_exclude_keyword = any(
+            exclude.lower() in text_to_check 
+            for exclude in self.EXCLUDE_KEYWORDS
+        )
+        
+        # Must have novel writing keyword and not have exclusion keyword
+        return has_novel_keyword and not has_exclude_keyword
+
     def search_repositories(self, query: str, min_stars: int = 0,
                            language: Optional[str] = None, 
                            sort: str = "stars",
@@ -232,8 +301,8 @@ class GitHubNovelWritingSkillsCollector:
         repositories = []
         page = 1
 
-        # Build search query with filters
-        search_query = f"{query} in:name,description,readme topic"
+        # Build search query with filters - use more specific search
+        search_query = f"{query} in:name,description,readme"
         if language:
             search_query += f" language:{language}"
         if min_stars > 0:
@@ -283,9 +352,14 @@ class GitHubNovelWritingSkillsCollector:
                             'search_query': query,
                             'license': repo.get('license', {}).get('key', 'unknown') if repo.get('license') else 'unknown'
                         }
-                        repositories.append(repo_info)
+                        
+                        # Filter: only keep repositories that are truly about novel writing
+                        if self.is_novel_writing_related(repo_info):
+                            repositories.append(repo_info)
+                        else:
+                            print(f"    Skipping unrelated repo: {repo['full_name']}")
 
-                    print(f"  Page {page}: Found {len(items)} repositories ({len(repositories)} new)")
+                    print(f"  Page {page}: Found {len(items)} repositories ({len(repositories)} new, filtered)")
 
                     # Check if there are more pages
                     if len(items) < per_page:
